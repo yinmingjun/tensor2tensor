@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,17 +20,18 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from six.moves import range
 from tensor2tensor.layers import common_layers
 from tensor2tensor.layers import common_video
 from tensor2tensor.layers import modalities
 from tensor2tensor.models.research import glow
 from tensor2tensor.models.research import glow_ops
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import tensorflow_probability as tfp
 
-
-arg_scope = tf.contrib.framework.arg_scope
+arg_scope = contrib.framework().arg_scope
 
 
 @registry.register_hparams
@@ -50,6 +51,7 @@ def next_frame_glow_hparams():
   # This function is used to model the prior over z_{t}. Can be,
   # Pointwise -> point-wise multiplication of z_{t-1}.
   # conv_net -> one-layer convolution over z_{t-1} .. z_{t - num_cond_latents}
+  # conv3d_net or conv_lstm
   hparams.add_hparam("latent_dist_encoder", "conv_net")
   # Number of latents used in the encoder above.
   hparams.add_hparam("num_cond_latents", 1)
@@ -65,17 +67,75 @@ def next_frame_glow_hparams():
   hparams.add_hparam("latent_dropout", 0.0)
   hparams.add_hparam("latent_pre_output_channels", 512)
   hparams.add_hparam("latent_activation", "relu")
+  hparams.add_hparam("latent_noise", 0.0)
   # Pretrains the glow encoder for "pretrain_steps" number of steps.
   # By default, don't pretrain and learn end-to-end
   hparams.add_hparam("pretrain_steps", -1)
-  hparams.modality = {
-      "inputs": modalities.VideoModalityL1Raw,
-      "targets": modalities.VideoModalityL1Raw,
+  hparams.bottom = {
+      "inputs": modalities.video_raw_bottom,
+      "targets": modalities.video_raw_targets_bottom,
+  }
+  hparams.loss = {
+      "targets": modalities.video_l1_raw_loss,
+  }
+  hparams.top = {
+      "targets": modalities.video_raw_top,
   }
   hparams.init_batch_size = 256
   hparams.batch_size = 32
   # Possible options: are prev_frame, single_conv and normal
   hparams.top_prior = "single_conv"
+  return hparams
+
+
+@registry.register_hparams
+def next_frame_glow_bair_quant():
+  """Hparams to reproduce bits-per-pixel results on BAIR action-free dataset."""
+  hparams = next_frame_glow_hparams()
+  hparams.video_num_input_frames = 3
+  hparams.video_num_target_frames = 10
+  hparams.num_train_frames = 4
+  hparams.num_cond_latents = 3
+  hparams.depth = 24
+  hparams.latent_dist_encoder = "conv3d_net"
+  hparams.latent_encoder_width = 256
+  hparams.latent_architecture = "glow_resnet"
+  hparams.latent_encoder_depth = 5
+  hparams.latent_apply_dilations = True
+  hparams.latent_activation = "gatu"
+  hparams.activation = "gatu"
+  hparams.learning_rate_constant = 3e-4
+  hparams.learning_rate_schedule = "constant*linear_warmup"
+  hparams.learning_rate_warmup_steps = 10000
+  hparams.init_batch_size = 128
+  hparams.batch_size = 5
+  return hparams
+
+
+@registry.register_hparams
+def next_frame_glow_bair_qual():
+  """Hparams for qualitative video generation results."""
+  hparams = next_frame_glow_bair_quant()
+  hparams.coupling = "additive"
+  hparams.temperature = 0.5
+  hparams.coupling_width = 392
+  return hparams
+
+
+@registry.register_hparams
+def next_frame_glow_shapes():
+  """Hparams for qualitative and quantitative results on shapes dataset."""
+  hparams = next_frame_glow_bair_quant()
+  hparams.video_num_input_frames = 1
+  hparams.video_num_target_frames = 2
+  hparams.num_train_frames = 2
+  hparams.num_cond_latents = 1
+  hparams.coupling = "additive"
+  hparams.coupling_width = 512
+  hparams.latent_encoder_depth = 10
+  hparams.latent_skip = False
+  hparams.learning_rate_constant = 1e-4
+  hparams.batch_size = 10
   return hparams
 
 
@@ -170,7 +230,7 @@ class NextFrameGlow(glow.Glow):
     else:
       num_target_frames = self.hparams.video_num_target_frames
 
-    ops = [glow_ops.get_variable_ddi, glow_ops.actnorm]
+    ops = [glow_ops.get_variable_ddi, glow_ops.actnorm, glow_ops.get_dropout]
     var_scope = tf.variable_scope("next_frame_glow/body", reuse=True)
     all_frames = []
 
@@ -211,7 +271,7 @@ class NextFrameGlow(glow.Glow):
     if self.hparams.gen_mode == "unconditional":
       predicted_video = tf.tile(
           predicted_video, [1, self.hparams.video_num_target_frames, 1, 1, 1])
-    predicted_video = self.scale(predicted_video)
+    predicted_video = glow_ops.postprocess(predicted_video)
 
     # Output of a single decode / sample.
     output_features = {}
@@ -285,6 +345,7 @@ class NextFrameGlow(glow.Glow):
         cond_top_latents = tf.concat(cond_top_latents, axis=-1)
 
         # Maps the latent-stack to a distribution.
+        cond_top_latents = glow_ops.noise_op(cond_top_latents, self.hparams)
         top = glow_ops.latent_to_dist(
             name, cond_top_latents, hparams=self.hparams,
             output_channels=output_channels)
@@ -293,6 +354,7 @@ class NextFrameGlow(glow.Glow):
         output_channels = common_layers.shape_list(cond_top_latents)[-1]
         # (h_t, c_t) = LSTM(z_{t-1}; (h_{t-1}, c_{t-1}))
         # (mu_t, sigma_t) = conv(h_t)
+        cond_top_latents = glow_ops.noise_op(cond_top_latents, self.hparams)
         _, self.top_state = common_video.conv_lstm_2d(
             cond_top_latents, self.top_state, self.hparams.latent_encoder_width,
             kernel_size=3, name="conv_lstm")
@@ -300,8 +362,10 @@ class NextFrameGlow(glow.Glow):
             name, self.top_state.h, output_channels=output_channels)
       elif self.hparams.latent_dist_encoder == "conv3d_net":
         last_latent = cond_top_latents[-1]
+        cond_top_latents = tf.stack(cond_top_latents, axis=1)
+        cond_top_latents = glow_ops.noise_op(cond_top_latents, self.hparams)
         top = glow_ops.temporal_latent_to_dist(
-            "conv3d", tf.stack(cond_top_latents, axis=1), self.hparams)
+            "conv3d", cond_top_latents, self.hparams)
 
       # mu(z_{t}) = z_{t-1} + latent_encoder(z_{cond})
       if self.hparams.latent_skip:
@@ -477,7 +541,7 @@ class NextFrameGlow(glow.Glow):
 
     cond_level_latents, cond_top_latents = None, None
     total_objective = 0.0
-    ops = [glow_ops.get_variable_ddi, glow_ops.actnorm]
+    ops = [glow_ops.get_variable_ddi, glow_ops.actnorm, glow_ops.get_dropout]
 
     with arg_scope(ops, init=init):
       for frame_ind, frame in enumerate(all_frames):

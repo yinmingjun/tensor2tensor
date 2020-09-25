@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from six.moves import range  # pylint: disable=redefined-builtin
 
 from tensor2tensor.rl.envs.in_graph_batch_env import InGraphBatchEnv
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 class WrapperBase(InGraphBatchEnv):
@@ -95,6 +95,7 @@ class StackWrapper(WrapperBase):
     super(StackWrapper, self).__init__(batch_env)
     self.history = history
     self.old_shape = batch_env.observ_shape
+    # TODO(afrozm): Make into tf.get_variable and use_resource=True
     self._observ = tf.Variable(
         tf.zeros((len(self),) + self.observ_shape, self.observ_dtype),
         trainable=False)
@@ -110,6 +111,14 @@ class StackWrapper(WrapperBase):
     reward, done = self._batch_env.simulate(action)
     with tf.control_dependencies([reward, done]):
       new_observ = tf.expand_dims(self._batch_env.observ, axis=1)
+
+      # If we shouldn't stack, i.e. self.history == 1, then just assign
+      # new_observ to self._observ and return from here.
+      if self.history == 1:
+        with tf.control_dependencies([self._observ.assign(new_observ)]):
+          return tf.identity(reward), tf.identity(done)
+
+      # If we should stack, then do the required work.
       old_observ = tf.gather(
           self._observ.read_value(),
           list(range(1, self.history)),
@@ -124,8 +133,11 @@ class StackWrapper(WrapperBase):
     new_values = self._batch_env._reset_non_empty(indices)
     # pylint: enable=protected-access
     initial_frames = getattr(self._batch_env, "history_observations", None)
+
+    num_dimensions_in_env_observation = len(self.old_shape)
+
     if initial_frames is None:
-      inx = [1, self.history, 1, 1, 1]
+      inx = [1, self.history] + ([1] * num_dimensions_in_env_observation)
       initial_frames = tf.tile(tf.expand_dims(new_values, axis=1), inx)
     with tf.control_dependencies([new_values]):
       assign_op = tf.scatter_update(self._observ, indices, initial_frames)

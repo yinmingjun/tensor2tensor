@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ from __future__ import print_function
 import math
 import random
 
+from absl import flags
 from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.data_generators import text_problems
@@ -38,9 +39,8 @@ from tensor2tensor.data_generators import wiki_revision_utils
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
-flags = tf.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer("wiki_revision_num_train_shards", 50,

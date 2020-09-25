@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ from tensor2tensor.layers import modalities
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 _DIR_NAME = "tasks_1-20_v1-2"
@@ -425,7 +425,7 @@ class BabiQa(text_problems.QuestionAndContext2TextProblem):
     (super(BabiQa, self).hparams(defaults, unused_model_hparams))
     p = defaults
     num_classes = self._encoders["targets"].vocab_size
-    p.modality = {"targets": modalities.ClassLabelModality}
+    p.modality = {"targets": modalities.ModalityType.CLASS_LABEL}
     p.vocab_size = {"targets": num_classes}
 
   def example_reading_spec(self):

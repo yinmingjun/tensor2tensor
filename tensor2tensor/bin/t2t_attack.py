@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ from tensor2tensor.utils import t2t_model
 from tensor2tensor.utils import trainer_lib
 from tensor2tensor.utils import usr_dir
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 flags = tf.flags
 FLAGS = flags.FLAGS
@@ -73,7 +73,7 @@ def create_attack_params():
 
 
 def create_attack(attack):
-  return registry.attacks(attack)
+  return registry.attack(attack)
 
 
 def create_surrogate_hparams():
@@ -200,7 +200,7 @@ def main(argv):
     sur_ch_model.get_probs(inputs)
 
     checkpoint_path = os.path.expanduser(FLAGS.surrogate_output_dir)
-    tf.contrib.framework.init_from_checkpoint(
+    tf.train.init_from_checkpoint(
         tf.train.latest_checkpoint(checkpoint_path), {"/": "surrogate/"})
     sess.run(tf.global_variables_initializer())
 

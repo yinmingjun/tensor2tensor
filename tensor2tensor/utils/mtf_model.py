@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,15 +20,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import copy
 import mesh_tensorflow as mtf
 
 import six
+from tensor2tensor.utils import hparams_lib
 from tensor2tensor.utils import learning_rate
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import t2t_model
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow.contrib.tpu.python.tpu import tpu_estimator
 
@@ -46,7 +46,7 @@ class MtfModel(t2t_model.T2TModel):
                          params=None,
                          decode_hparams=None,
                          use_tpu=False):
-    hparams = copy.deepcopy(hparams)
+    hparams = hparams_lib.copy_hparams(hparams)
     hparams.use_tpu = use_tpu
     # merge decode_hparams into hparams if present
     if mode == tf.estimator.ModeKeys.PREDICT and decode_hparams is not None:
@@ -160,14 +160,27 @@ class MtfModel(t2t_model.T2TModel):
       else:
         host_call = None
 
+      if hparams.warm_start_from:
+
+        def scaffold_fn():
+          t2t_model.initialize_from_ckpt(
+              ckpt_dir=hparams.warm_start_from, hparams=hparams)
+          return tf.train.Scaffold()
+      else:
+        scaffold_fn = None
+
       t2t_model.remove_summaries()
       return tpu_estimator.TPUEstimatorSpec(
           mode=tf.estimator.ModeKeys.TRAIN,
           loss=tf_loss,
           train_op=train_op,
           host_call=host_call,
-          training_hooks=[restore_hook, saver_hook])
+          training_hooks=[restore_hook, saver_hook],
+          scaffold_fn=scaffold_fn)
     else:
+      if hparams.warm_start_from:
+        t2t_model.initialize_from_ckpt(
+            ckpt_dir=hparams.warm_start_from, hparams=hparams)
       return tf.estimator.EstimatorSpec(
           tf.estimator.ModeKeys.TRAIN, loss=tf_loss, train_op=train_op,
           training_chief_hooks=[restore_hook, saver_hook])

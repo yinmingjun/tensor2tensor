@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from __future__ import print_function
 import numpy as np
 from tensor2tensor.data_generators import problem_hparams
 from tensor2tensor.models.research import transformer_vae
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 class TransformerVaeTest(tf.test.TestCase):
@@ -37,9 +37,9 @@ class TransformerVaeTest(tf.test.TestCase):
                                                      vocab_size,
                                                      hparams)
     hparams.problem_hparams = p_hparams
-    inputs = -1 + np.random.random_integers(
+    inputs = np.random.randint(
         vocab_size, size=(batch_size, input_length, 1, 1))
-    targets = -1 + np.random.random_integers(
+    targets = np.random.randint(
         vocab_size, size=(batch_size, target_length, 1, 1))
     features = {
         "inputs": tf.constant(inputs, dtype=tf.int32),

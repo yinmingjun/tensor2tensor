@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,9 +33,10 @@ from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import problem
 from tensor2tensor.data_generators import video_utils
 from tensor2tensor.layers import modalities
+from tensor2tensor.utils import contrib
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 DATA_URL = (
     "http://rail.eecs.berkeley.edu/datasets/bair_robot_pushing_dataset_v0.tar")
@@ -72,12 +73,12 @@ class VideoBairRobotPushing(video_utils.VideoProblem):
   def total_number_of_frames(self):
     return 167 * 256 * 30
 
+  def max_frames_per_video(self, hparams):
+    return 30
+
   @property
   def random_skip(self):
     return False
-
-  def eval_metrics(self):
-    return []
 
   @property
   def only_keep_videos_from_0th_frame(self):
@@ -88,21 +89,29 @@ class VideoBairRobotPushing(video_utils.VideoProblem):
     return True
 
   @property
+  def dataset_splits(self):
+    """Splits of data to produce and number of output shards for each."""
+    return [
+        {"split": problem.DatasetSplit.TRAIN, "shards": 10},
+        {"split": problem.DatasetSplit.EVAL, "shards": 1},
+        {"split": problem.DatasetSplit.TEST, "shards": 1}]
+
+  @property
   def extra_reading_spec(self):
     """Additional data fields to store on disk and their decoders."""
     data_fields = {
         "frame_number": tf.FixedLenFeature([1], tf.int64),
     }
     decoders = {
-        "frame_number": tf.contrib.slim.tfexample_decoder.Tensor(
-            tensor_key="frame_number"),
+        "frame_number":
+            contrib.slim().tfexample_decoder.Tensor(tensor_key="frame_number"),
     }
     return data_fields, decoders
 
   def hparams(self, defaults, unused_model_hparams):
     p = defaults
-    p.modality = {"inputs": modalities.VideoModality,
-                  "targets": modalities.VideoModality}
+    p.modality = {"inputs": modalities.ModalityType.VIDEO,
+                  "targets": modalities.ModalityType.VIDEO}
     p.vocab_size = {"inputs": 256,
                     "targets": 256}
 
@@ -179,9 +188,9 @@ class VideoBairRobotPushingWithActions(VideoBairRobotPushing):
         "action": tf.FixedLenFeature([4], tf.float32),
     }
     decoders = {
-        "frame_number": tf.contrib.slim.tfexample_decoder.Tensor(
-            tensor_key="frame_number"),
-        "action": tf.contrib.slim.tfexample_decoder.Tensor(tensor_key="action"),
+        "frame_number":
+            contrib.slim().tfexample_decoder.Tensor(tensor_key="frame_number"),
+        "action":
+            contrib.slim().tfexample_decoder.Tensor(tensor_key="action"),
     }
     return data_fields, decoders
-

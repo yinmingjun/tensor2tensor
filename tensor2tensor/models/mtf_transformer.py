@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ from tensor2tensor.models.research import moe
 from tensor2tensor.utils import mtf_model
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 @registry.register_model
@@ -403,15 +403,13 @@ class MtfTransformer(mtf_model.MtfModel):
 
   @property
   def _targets_vocab_size(self):
-    targets_vocab_size = self._problem_hparams.modality[
-        "targets"].top_dimensionality
+    targets_vocab_size = self._problem_hparams.vocab_size["targets"]
     targets_vocab_size += (-targets_vocab_size) % self._hparams.vocab_divisor
     return targets_vocab_size
 
   @property
   def _inputs_vocab_size(self):
-    inputs_vocab_size = self._problem_hparams.modality[
-        "inputs"].top_dimensionality
+    inputs_vocab_size = self._problem_hparams.vocab_size["inputs"]
     inputs_vocab_size += (-inputs_vocab_size) % self._hparams.vocab_divisor
     return inputs_vocab_size
 
@@ -856,9 +854,12 @@ def mtf_transformer_base():
   # These parameters make Transformer model compatible with MtfTransformer
   # Do not override these, as mtf_transformer does not support other options.
   hparams.clip_grad_norm = 0.  # i.e. no gradient clipping
-  hparams.modality = {
-      "inputs": modalities.IdentitySymbolModality,
-      "targets": modalities.IdentitySymbolModality,
+  hparams.bottom = {
+      "inputs": modalities.identity_bottom,
+      "targets": modalities.identity_bottom,
+  }
+  hparams.top = {
+      "targets": modalities.identity_top,
   }
 
   # Parameters for computing the maximum decode length in beam search.

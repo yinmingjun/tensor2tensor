@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from tensor2tensor.data_generators import problem_hparams
 from tensor2tensor.layers import modalities
 from tensor2tensor.models import xception
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 class XceptionTest(tf.test.TestCase):
@@ -33,17 +33,16 @@ class XceptionTest(tf.test.TestCase):
   def _test_xception(self, img_size):
     vocab_size = 9
     batch_size = 3
-    x = np.random.random_integers(
-        0, high=255, size=(batch_size, img_size, img_size, 3))
-    y = np.random.random_integers(
-        1, high=vocab_size - 1, size=(batch_size, 1, 1, 1))
+    x = np.random.randint(
+        256, size=(batch_size, img_size, img_size, 3))
+    y = np.random.randint(
+        1, high=vocab_size, size=(batch_size, 1, 1, 1))
     hparams = xception.xception_tiny()
     p_hparams = problem_hparams.test_problem_hparams(vocab_size,
                                                      vocab_size,
                                                      hparams)
-    p_hparams.modality["inputs"] = modalities.ImageModality(hparams)
-    p_hparams.modality["targets"] = modalities.ClassLabelModality(
-        hparams, vocab_size)
+    p_hparams.modality["inputs"] = modalities.ModalityType.IMAGE
+    p_hparams.modality["targets"] = modalities.ModalityType.CLASS_LABEL
     with self.test_session() as session:
       features = {
           "inputs": tf.constant(x, dtype=tf.int32),

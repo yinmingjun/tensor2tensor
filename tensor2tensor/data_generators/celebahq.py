@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from tensor2tensor.layers import modalities
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 @registry.register_problem
@@ -79,7 +79,7 @@ class ImageCelebahq128(image_utils.ImageProblem):
   def hparams(self, defaults, unused_model_hparams):
     p = defaults
     p.batch_size_multiplier = 1
-    p.modality = {"inputs": modalities.IdentityModality}
+    p.modality = {"inputs": modalities.ModalityType.IDENTITY}
     p.vocab_size = {"inputs": 256}
     p.input_space_id = 1
 

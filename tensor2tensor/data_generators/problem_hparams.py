@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 The Tensor2Tensor Authors.
+# Copyright 2020 The Tensor2Tensor Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ from tensor2tensor.data_generators import text_encoder
 from tensor2tensor.layers import modalities
 from tensor2tensor.utils import registry
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 # TODO(rsepassi): Merge these problems with their data generators. Currently
 # they only implement the hparams.
@@ -68,8 +68,8 @@ class AudioTimitCharactersTune(AudioTimitProblem):
 
   def hparams(self, defaults, model_hparams):
     hp = defaults
-    hp.modality = {"inputs": modalities.SpeechRecognitionModality,
-                   "targets": modalities.SymbolModality}
+    hp.modality = {"inputs": modalities.ModalityType.SPEECH_RECOGNITION,
+                   "targets": modalities.ModalityType.SYMBOL}
     hp.vocab_size = {"inputs": None,
                      "targets": 256}
 
@@ -93,8 +93,8 @@ class AudioTimitTokens8kTune(AudioTimitProblem):
 
   def hparams(self, defaults, model_hparams):
     hp = defaults
-    hp.modality = {"inputs": modalities.SpeechRecognitionModality,
-                   "targets": modalities.SymbolModality}
+    hp.modality = {"inputs": modalities.ModalityType.SPEECH_RECOGNITION,
+                   "targets": modalities.ModalityType.SYMBOL}
     hp.vocab_size = {
         "inputs": None,
         "targets": self.get_feature_encoders()["targets"].vocab_size,
@@ -130,8 +130,8 @@ class ParsingEnglishPtb8k(problem.Problem):
 
   def hparams(self, defaults, model_hparams):
     hp = defaults
-    hp.modality = {"inputs": modalities.SymbolModality,
-                   "targets": modalities.SymbolModality}
+    hp.modality = {"inputs": modalities.ModalityType.SYMBOL,
+                   "targets": modalities.ModalityType.SYMBOL}
     hp.vocab_size = {
         "inputs": self.get_feature_encoders()["inputs"].vocab_size,
         "targets": self.get_feature_encoders()["targets"].vocab_size,
@@ -174,8 +174,8 @@ class ParsingEnglishPtb16k(problem.Problem):
 
   def hparams(self, defaults, model_hparams):
     hp = defaults
-    hp.modality = {"inputs": modalities.SymbolModality,
-                   "targets": modalities.SymbolModality}
+    hp.modality = {"inputs": modalities.ModalityType.SYMBOL,
+                   "targets": modalities.ModalityType.SYMBOL}
     hp.vocab_size = {
         "inputs": self.get_feature_encoders()["inputs"].vocab_size,
         "targets": self.get_feature_encoders()["targets"].vocab_size,
@@ -194,8 +194,8 @@ class TestProblem(problem.Problem):
 
   def hparams(self, defaults, model_hparams):
     hp = defaults
-    hp.modality = {"inputs": modalities.SymbolModality,
-                   "targets": modalities.SymbolModality}
+    hp.modality = {"inputs": modalities.ModalityType.SYMBOL,
+                   "targets": modalities.ModalityType.SYMBOL}
     hp.vocab_size = {"inputs": self.input_vocab_size,
                      "targets": self.target_vocab_size}
 
